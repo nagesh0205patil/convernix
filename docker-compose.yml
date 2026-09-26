@@ -1,0 +1,119 @@
+services:
+  whatsapp-database-service:
+    image: postgres:16-alpine
+    container_name: whatsapp-database-service
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-whatsapp_marketing}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-whatsapp_marketing}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  whatsapp-backend-service:
+    container_name: whatsapp-backend-service
+    build:
+      context: ./Backend
+    env_file:
+      - ./Backend/.env
+    environment:
+      POSTGRES_HOST: whatsapp-database-service
+      POSTGRES_PORT: 5432
+      DEBUG: ${DEBUG:-True}
+    depends_on:
+      whatsapp-database-service:
+        condition: service_healthy
+      whatsapp-redisdbs-service:
+        condition: service_healthy
+    ports:
+      - "9090:8000"
+    volumes:
+      - media_data:/app/media
+    command: >
+      sh -c "python manage.py migrate &&
+      python manage.py collectstatic --noinput &&
+      python manage.py ensure_platform_admin &&
+      python manage.py ensure_default_tenant &&
+      gunicorn backend.wsgi:application
+      --bind 0.0.0.0:8000
+      --worker-class gthread
+      --workers 2
+      --threads 4
+      --timeout 60
+      --graceful-timeout 30
+      --keep-alive 5
+      --max-requests 1000
+      --max-requests-jitter 100
+      --access-logfile -
+      --error-logfile -"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import http.client; c=http.client.HTTPConnection('127.0.0.1',8000,timeout=5); c.request('GET','/api/health/'); r=c.getresponse(); raise SystemExit(0 if 200 <= r.status < 300 else 1)\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  whatsapp-worker-service:
+    container_name: whatsapp-worker-service
+    build:
+      context: ./Backend
+    env_file:
+      - ./Backend/.env
+    environment:
+      POSTGRES_HOST: whatsapp-database-service
+      POSTGRES_PORT: 5432
+      CELERY_BROKER_URL: redis://whatsapp-redisdbs-service:6379/0
+      CELERY_RESULT_BACKEND: redis://whatsapp-redisdbs-service:6379/1
+    depends_on:
+      whatsapp-database-service:
+        condition: service_healthy
+      whatsapp-redisdbs-service:
+        condition: service_healthy
+    command: celery -A backend worker --loglevel=INFO
+
+  whatsapp-redisdbs-service:
+    image: redis:7-alpine
+    container_name: whatsapp-redisdbs-service
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  whatsapp-frontend-service:
+    container_name: whatsapp-frontend-service
+    build:
+      context: ./Frontend
+    env_file:
+      - ./Frontend/.env
+    depends_on:
+      - whatsapp-backend-service
+    ports:
+      - "8080:80"
+
+  whatsapp-ngrok-service:
+    image: ngrok/ngrok:latest
+    container_name: whatsapp-ngrok-service
+    env_file:
+      - ./Backend/.env
+    command: ["http", "http://whatsapp-frontend-service:80", "--log=stdout"]
+    depends_on:
+      - whatsapp-frontend-service
+    ports:
+      - "4041:4040"
+    profiles:
+      - local-tunnel
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:

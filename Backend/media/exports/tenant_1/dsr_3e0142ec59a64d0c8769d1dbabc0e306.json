@@ -1,0 +1,22 @@
+{
+  "data_principal": {
+    "customer_id": 1,
+    "full_name": "Vikram Seth",
+    "phone_number": "+919123456789",
+    "email": "vikram@acme.test",
+    "organization": "",
+    "created_at": "2026-09-25T10:54:47.231858+00:00"
+  },
+  "enquiries": [
+    {
+      "reference": "ENQ-4922F71DAFA4",
+      "department": "Support",
+      "message": "Test enquiry for DSR",
+      "status": "new",
+      "created_at": "2026-09-25T10:54:47.234858+00:00"
+    }
+  ],
+  "messages": [],
+  "privacy_events": [],
+  "exported_at": "2026-09-25T10:54:47.243522+00:00"
+}

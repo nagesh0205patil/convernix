@@ -1,0 +1,9 @@
+@scope (.convernix-site) {
+  :scope { overflow-x: clip; min-height: 100vh; }
+  .auth-providers { display: grid; gap: 10px; }
+  .auth-providers .button { justify-content: flex-start; white-space: normal; }
+  .auth-providers small { margin-left: auto; font-size: 10px; }
+  .auth-providers button:disabled { cursor: not-allowed; }
+  .auth-divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 11px; }
+  .auth-divider::before, .auth-divider::after { content: ''; height: 1px; flex: 1; background: var(--border); }
+}
